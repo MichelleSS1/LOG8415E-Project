@@ -56,7 +56,7 @@ def create_jumpbox(vpc_id: str, subnet_id: str, key_name: str, infra_info: Infra
         jumpbox_user_data = f.read()
 
     jumpbox_instance = create_ubuntu_instances("t2.micro", 1, 1, key_name, True, subnet_id,
-                                               sec_group_jumpbox, infra_info.instances_tags | {"Name": "Jumpbox"}, jumpbox_user_data)[0]
+                                               [sec_group_jumpbox.id], infra_info.instances_tags | {"Name": "Jumpbox"}, jumpbox_user_data)[0]
     jumpbox_pub_key = get_jumpbox_ssh_public_key(
         jumpbox_instance.public_dns_name)
 
@@ -72,7 +72,7 @@ def create_standalone_mysql(vpc_id: str, subnet_id: str, key_name: str, user_dat
     infra_info.security_groups_ids.append(sec_group_standalone_mysql.id)
 
     standalone_mysql_instance = create_ubuntu_instances(
-        "t2.micro", 1, 1, key_name, True, subnet_id, sec_group_standalone_mysql, infra_info.instances_tags | {"Name": "Standalone"}, user_data)[0]
+        "t2.micro", 1, 1, key_name, True, subnet_id, [sec_group_standalone_mysql.id], infra_info.instances_tags | {"Name": "Standalone"}, user_data)[0]
 
     authorize_ingress(sec_group_standalone_mysql, [
         {"protocol": "tcp", "port": MYSQL_PORT, "ip_range": "0.0.0.0/0"},
@@ -88,7 +88,7 @@ def create_gatekeeper(vpc_id: str, subnet_id: str, key_name: str, user_data: str
     infra_info.security_groups_ids.append(sec_group_gatekeeper.id)
 
     gatekeeper_instance = create_ubuntu_instances(
-        "t2.large", 1, 1, key_name, True, subnet_id, sec_group_gatekeeper, infra_info.instances_tags | {"Name": "Gatekeeper"}, user_data)[0]
+        "t2.large", 1, 1, key_name, True, subnet_id, [sec_group_gatekeeper.id], infra_info.instances_tags | {"Name": "Gatekeeper"}, user_data)[0]
 
     authorize_ingress(sec_group_gatekeeper, [
         {"protocol": "tcp", "port": FLASK_PORT, "ip_range": "0.0.0.0/0"},
@@ -104,7 +104,7 @@ def create_proxy(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jum
     infra_info.security_groups_ids.append(sec_group_proxy.id)
 
     proxy_instance = create_ubuntu_instances("t2.large", 1, 1, key_name, False, subnet_id,
-                                             sec_group_proxy, infra_info.instances_tags | {"Name": "Proxy"}, user_data)[0]
+                                             [sec_group_proxy.id], infra_info.instances_tags | {"Name": "Proxy"}, user_data)[0]
 
     authorize_ingress(sec_group_proxy, [
         {"protocol": "tcp", "port": FLASK_PORT,
@@ -121,7 +121,7 @@ def create_manager(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str,
     infra_info.security_groups_ids.append(sec_group_manager.id)
 
     manager_instance = create_ubuntu_instances(
-        "t2.small", 1, 1, key_name, False, subnet_id, sec_group_manager, infra_info.instances_tags | {"Name": "Manager"}, user_data)[0]
+        "t2.small", 1, 1, key_name, False, subnet_id, [sec_group_manager.id], infra_info.instances_tags | {"Name": "Manager"}, user_data)[0]
 
     authorize_ingress(sec_group_manager, [
         {"protocol": "tcp", "port": MYSQL_PORT,
@@ -139,7 +139,7 @@ def create_data_nodes(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: s
     infra_info.security_groups_ids.append(sec_group_data_node.id)
 
     data_nodes_instances = create_ubuntu_instances(
-        "t2.small", 3, 3, key_name, False, subnet_id, sec_group_data_node, infra_info.instances_tags, user_data)
+        "t2.small", 3, 3, key_name, False, subnet_id, [sec_group_data_node.id], infra_info.instances_tags, user_data)
 
     authorize_ingress(sec_group_data_node, [
         {"protocol": "tcp", "port": MYSQL_PORT,
@@ -169,8 +169,7 @@ def create_instances(infra_info: InfraInfo):
 
     infra_info.instances_tags = {"Purpose": "LOG8415E-Project"}
 
-    jumpbox_instance, jumpbox_pub_key = create_jumpbox(
-        vpc_id, subnet_id, subnet_cidr, key_name, infra_info)
+    jumpbox_instance, jumpbox_pub_key = create_jumpbox(vpc_id, subnet_id, key_name, infra_info)
     jumpbox_private_ip = jumpbox_instance.private_ip_address
 
     user_data = f"#!/bin/bash\njumpbox_pub_key={jumpbox_pub_key}\necho -e $jumpbox_pub_key >> ~/.ssh/authorized_keys"

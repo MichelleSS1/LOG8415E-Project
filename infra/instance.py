@@ -44,6 +44,7 @@ def create_ubuntu_instances(
         UserData=user_data,
         NetworkInterfaces=[
             {
+                'DeviceIndex': 0,
                 'AssociatePublicIpAddress': associate_public_ip,
                 'Groups': security_groups,
                 'SubnetId': subnet_id,
@@ -62,16 +63,6 @@ def create_ubuntu_instances(
             }
         ]
     )
-
-    i = 0
-    for instance in instances:
-        ec2.create_tags(Resources=[instance.id], Tags=[
-            {
-                'Key': 'Name',
-                'Value': instance_type.replace('.','-') + '-' + str(i)
-            },
-        ])
-        i += 1
 
     print("done\n")
     return instances

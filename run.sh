@@ -65,8 +65,10 @@ pip install -r requirements.txt
 printf "\n"
 
 read -s -r -p "Mysql server root password: " root_password
+printf "\n"
 read -r -p "Mysql server username: " username
 read -s -r -p "Mysql user password: " user_password
+printf "\n"
 
 export ROOT_PASSWORD=$root_password
 export USER=$username
@@ -86,6 +88,12 @@ printf "\n"
 
 # Run sysbench
 python sysbench/run_sysbench.py
+
+answer=''
+while [ "${answer,,}" != "yes" ]
+do
+    read -r -p "Are you done? Do you want to proceed to teardown? [yes] " answer
+done
 
 # Teardown of the infrastructure
 python infra/teardown_infra.py

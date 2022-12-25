@@ -141,17 +141,17 @@ def authorize_ingress(security_group:ec2.SecurityGroup, rules: list[dict]):
             IpPermissions=ingress_IpPermissions
         )
 
-# def authorize_egress(security_group:ec2.SecurityGroup, rules: list[dict]):
-#     if len(rules) > 0:
-#         egress_IpPermissions=[]
-#         for rule in rules:
-#             egress_IpPermissions.append(
-#                 get_ip_policy(rule["protocol"], rule["port"], rule["ip_range"])
-#             )
+def authorize_egress(security_group:ec2.SecurityGroup, rules: list[dict]):
+    if len(rules) > 0:
+        egress_IpPermissions=[]
+        for rule in rules:
+            egress_IpPermissions.append(
+                get_ip_policy(rule["protocol"], rule["port"], rule["ip_range"])
+            )
 
-#         security_group.authorize_egress(
-#             IpPermissions=egress_IpPermissions
-#         )
+        security_group.authorize_egress(
+            IpPermissions=egress_IpPermissions
+        )
 
 def delete_security_group(group_id:str):
     """
