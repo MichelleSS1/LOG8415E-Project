@@ -14,7 +14,6 @@ class InfraInfo:
     """
     Class to store infra details
     """
-    security_groups_ids:"list[str]"
     instances_tags: "dict[str, str]"
 
 
@@ -112,19 +111,37 @@ def get_ip_policy(protocol:str, port:int, ip_range:str):
         'ToPort': port,
     }
 
-def create_security_group(group_name:str, description:str, vpc_id:str):
+def create_security_group(group_name:str, description:str, vpc_id:str, tags:"dict[str, str]"):
     """
     Creates a security group.
 
     @param group_name:str               Name of the security group
     @param description:str              Description of the security group
     @param vpc_id:str                   Virtual Private Cloud ID where to create security_group
+    @param tags:dict[str, str]          tags to put on security group
+    
 
     @return                             Response containing the ID of the security group and other data
     """
     print("Creating security group: ", group_name)
 
-    security_group = ec2.create_security_group(GroupName=group_name, Description=description, VpcId=vpc_id)
+    security_group = ec2.create_security_group(
+        GroupName=group_name, 
+        Description=description, 
+        VpcId=vpc_id,
+        TagSpecifications=[
+            {
+                'ResourceType': 'instance',
+                'Tags': [
+                    {
+                        'Key': key,
+                        'Value': value
+                    }
+                    for key, value in tags.items()
+                ]
+            }
+        ]
+    )
     
     print("done\n")
     return security_group
@@ -136,7 +153,7 @@ def authorize_ingress(security_group:ec2.SecurityGroup, rules: list[dict]):
             ingress_IpPermissions.append(
                 get_ip_policy(rule["protocol"], rule["port"], rule["ip_range"])
             )
-
+        print(ingress_IpPermissions)
         security_group.authorize_ingress(
             IpPermissions=ingress_IpPermissions
         )
@@ -152,6 +169,27 @@ def authorize_egress(security_group:ec2.SecurityGroup, rules: list[dict]):
         security_group.authorize_egress(
             IpPermissions=egress_IpPermissions
         )
+
+def get_security_groups_ids(filters:"list[dict]"):
+    """
+    Retrieve security groups ids corresponding to filters.
+
+    @return                            Found ids ; all ids if filters empty
+    """
+    sec_group_ids = []
+
+    if len(filters) > 0:
+        security_groups = ec2_client.describe_security_groups(
+            Filters=filters
+        )['SecurityGroups']
+    else:
+        security_groups = ec2_client.describe_instances()['SecurityGroups']
+
+    if len(security_groups) > 0:
+        for sec_group in security_groups:
+            sec_group_ids.append(sec_group['GroupId'])
+
+    return sec_group_ids
 
 def delete_security_group(group_id:str):
     """

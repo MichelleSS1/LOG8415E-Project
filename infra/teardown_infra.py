@@ -2,7 +2,7 @@ import os
 import sys
 from time import sleep
 from instance import terminate_instances, get_instances_ids
-from infra_utils import delete_security_group, filters_from_tags, get_infra_info
+from infra_utils import delete_security_group, filters_from_tags, get_infra_info, get_security_groups_ids
 
 
 def teardown_infra(infra_info_path:str):
@@ -16,21 +16,21 @@ def teardown_infra(infra_info_path:str):
     print("Starting teardown")
 
     infra_info = get_infra_info(infra_info_path)
+    filters = filters_from_tags(infra_info.instances_tags)
 
     # Get instances dynamically
     if len(infra_info.instances_tags) > 0:
-        filters = filters_from_tags(infra_info.instances_tags)
         instances_ids = get_instances_ids(filters)
         
         if len(instances_ids) > 0:
             terminate_instances(instances_ids)
     
-    for sec_gp in infra_info.security_groups_ids:
-        try:
-            delete_security_group(sec_gp)
-        except:
-            sleep(60)
-            delete_security_group(sec_gp)
+        for sec_gp in get_security_groups_ids(filters):
+            try:
+                delete_security_group(sec_gp)
+            except:
+                sleep(60)
+                delete_security_group(sec_gp)
 
     print("Teardown complete")
 

@@ -47,6 +47,8 @@ def get_jumpbox_ssh_public_key(jumpbox_dns_name: str):
 
 
 def create_jumpbox(vpc_id: str, subnet_id: str, key_name: str, infra_info: InfraInfo):
+    print("Jumpbox creation")
+
     sec_group_jumpbox = create_security_group(
         "sec_group_jumpbox", "Security group for Jumpbox", vpc_id)
     infra_info.security_groups_ids.append(sec_group_jumpbox.id)
@@ -57,6 +59,10 @@ def create_jumpbox(vpc_id: str, subnet_id: str, key_name: str, infra_info: Infra
 
     jumpbox_instance = create_ubuntu_instances("t2.micro", 1, 1, key_name, True, subnet_id,
                                                [sec_group_jumpbox.id], infra_info.instances_tags | {"Name": "Jumpbox"}, jumpbox_user_data)[0]
+    waiter = ec2_client.get_waiter('instance_running')
+    waiter.wait(InstanceIds=[jumpbox_instance.id])
+    jumpbox_instance.reload()
+
     jumpbox_pub_key = get_jumpbox_ssh_public_key(
         jumpbox_instance.public_dns_name)
 
@@ -64,9 +70,13 @@ def create_jumpbox(vpc_id: str, subnet_id: str, key_name: str, infra_info: Infra
         {"protocol": "tcp", "port": SSH_PORT, "ip_range": "0.0.0.0/0"}
     ])
 
+    print("done\n")
+
     return jumpbox_instance, jumpbox_pub_key
 
 def create_standalone_mysql(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, infra_info: InfraInfo):
+    print("Standalone mysql creation")
+
     sec_group_standalone_mysql = create_security_group(
         "sec_group_standalone_mysql", "Security group for Standalone MySQL", vpc_id)
     infra_info.security_groups_ids.append(sec_group_standalone_mysql.id)
@@ -80,9 +90,12 @@ def create_standalone_mysql(vpc_id: str, subnet_id: str, key_name: str, user_dat
             "ip_range": jumpbox_private_ip + "/32"}
     ])
 
+    print("done\n")
     return standalone_mysql_instance
 
 def create_gatekeeper(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, infra_info: InfraInfo):
+    print("Gatekeeper creation")
+
     sec_group_gatekeeper = create_security_group(
         "sec_group_gatekeeper", "Security group for Gatekeeper node", vpc_id)
     infra_info.security_groups_ids.append(sec_group_gatekeeper.id)
@@ -96,9 +109,12 @@ def create_gatekeeper(vpc_id: str, subnet_id: str, key_name: str, user_data: str
             "ip_range": jumpbox_private_ip + "/32"}
     ])
 
+    print("done\n")
     return gatekeeper_instance
 
 def create_proxy(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, gatekeeper_private_ip: str, infra_info: InfraInfo):
+    print("Proxy creation")
+
     sec_group_proxy = create_security_group(
         "sec_group_proxy", "Security group for Proxy node", vpc_id)
     infra_info.security_groups_ids.append(sec_group_proxy.id)
@@ -113,9 +129,12 @@ def create_proxy(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jum
             "ip_range": jumpbox_private_ip + "/32"}
     ])
 
+    print("done\n")
     return proxy_instance
 
 def create_manager(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str, user_data: str, jumpbox_private_ip: str, proxy_private_ip: str, infra_info: InfraInfo):
+    print("Manager creation")
+
     sec_group_manager = create_security_group(
         "sec_group_manager", "Security group for Manager node", vpc_id)
     infra_info.security_groups_ids.append(sec_group_manager.id)
@@ -131,9 +150,12 @@ def create_manager(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str,
             "ip_range": jumpbox_private_ip + "/32"}
     ])
 
+    print("done\n")
     return manager_instance
 
 def create_data_nodes(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str, user_data: str, jumpbox_private_ip: str, proxy_private_ip: str, infra_info: InfraInfo):
+    print("Data nodes creation")
+
     sec_group_data_node = create_security_group(
         "sec_group_data_node", "Security group for Data nodes", vpc_id)
     infra_info.security_groups_ids.append(sec_group_data_node.id)
@@ -149,6 +171,7 @@ def create_data_nodes(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: s
             "ip_range": jumpbox_private_ip + "/32"}
     ])
 
+    print("done\n")
     return data_nodes_instances
 
 def create_instances(infra_info: InfraInfo):
