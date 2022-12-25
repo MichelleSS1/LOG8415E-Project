@@ -58,11 +58,10 @@ printf "Hey champion, now that we have what we need to connect to AWS, we can se
 # Install python dependencies in a virtual environment
 sudo apt-get update -y
 sudo apt install python3-venv
-python3 -m venv log8415_lab1_venv
-source log8415_lab1_venv/bin/activate
+python3 -m venv log8415_project_venv
+source log8415_project_venv/bin/activate
 
 pip install -r requirements.txt
-pip install -e .
 printf "\n"
 
 read -s -r -p "Mysql server root password: " root_password
@@ -72,7 +71,6 @@ read -s -r -p "Mysql user password: " user_password
 export ROOT_PASSWORD=$root_password
 export USER=$username
 export PASSWORD=$user_password
-
 
 # Setup infra
 python infra/setup_infra.py
@@ -86,28 +84,8 @@ then
 fi
 printf "\n"
 
-# Set load balancer DNS name 
-LB_DNS_NAME=$(cat ./infra/lb_dns_name.txt) 
-
-# Build docker image for bechmark tests
-printf "Building docker image for benchmark\n\n"
-docker build -q ./benchmark -t log8415_lab1
-printf "\n"
-
-# Run a container for tests and make load balancer DNS name available in container for calls
-# Adding --rm to docker run to make the container be removed automatically when it exits.
-printf "Starting docker container for benchmark\n\n"
-docker run --rm -it -e LB_DNS_NAME="${LB_DNS_NAME}" log8415_lab1
-printf "\n"
-
-# Delete docker image
-printf "Deleting docker image\n"
-docker image rm log8415_lab1
-printf "\n"
-
-# Get metrics and plot them
-mkdir -p benchmark/plots
-python benchmark/benchmark_metrics.py
+# Run sysbench
+python sysbench/run_sysbench.py
 
 # Teardown of the infrastructure
 python infra/teardown_infra.py

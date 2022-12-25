@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from time import sleep
@@ -270,7 +271,7 @@ def setup_instances(instances_hostnames: dict):
 
         print(f"Executing setup script of host {host}. It may take some time.")
         _, stdout, stderr = client.exec_command(
-            command=jumpbox_script + '\n' + script, get_pty=True)
+            command=jumpbox_script.replace('$script', script), get_pty=True)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status == 0:
             all_stderr.append(stderr)
@@ -298,10 +299,13 @@ if __name__ == '__main__':
     infra_info.instances_tags = {"Purpose": "LOG8415E-Project"}
 
     try:
-
         _, instances_hostnames = create_instances(infra_info)
+        with open(get_absolute_path('instances_hostnames.json'), 'w') as f:
+            json.dump(instances_hostnames, f)
         stderr = setup_instances(instances_hostnames)
-
+        print("Error output:\n")
+        for line in stderr:
+            print(line)
     except:
         raise
     finally:

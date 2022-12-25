@@ -31,7 +31,7 @@ local_proxy = LocalProxy()
 
 @app.route('/')
 def health_check():
-    return "Healthy!"
+    return "Healthy gatekeeper!"
 
 @app.route('/write-query', methods=['POST'])
 def execute_write_query():

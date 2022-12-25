@@ -80,7 +80,7 @@ def custom_hit(query):
 
 @app.route('/')
 def health_check():
-    return "Healthy!"
+    return "Healthy proxy!"
 
 @app.route('/write-query', methods=['POST'])
 def execute_write_query():
