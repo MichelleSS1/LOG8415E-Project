@@ -9,12 +9,13 @@ sudo sed -i "s/\#\$nrconf{restart} = 'i'/\$nrconf{restart} = 'l'/" /etc/needrest
 sudo apt update
 sudo apt install mysql-server -y
 sudo systemctl start mysql.service
-sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$root_password';"
+sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$root_password';"
 
 git clone https://github.com/MichelleSS1/LOG8415E-Project.git
 # To run mysql_secure_installation without prompt
 sudo apt install -y expect
-sudo ./LOG8415E-Project/script.exp $root_password
+sed -i "s/root_password/$root_password/" ./LOG8415E-Project/script.exp
+sudo ./LOG8415E-Project/script.exp
 
 mysql -u root -p'$root_password' -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH auth_socket;"
 

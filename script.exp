@@ -49,7 +49,7 @@ expect -exact "\r
 Securing the MySQL server deployment.\r
 \r
 Enter password for user root: "
-send -- "$1\r"
+send -- "root_password\r"
 expect -exact "\r
 \r
 VALIDATE PASSWORD COMPONENT can be used to test passwords\r
