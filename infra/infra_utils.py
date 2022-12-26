@@ -14,7 +14,7 @@ class InfraInfo:
     """
     Class to store infra details
     """
-    instances_tags: "dict[str, str]"
+    tags: "dict[str, str]"
 
 
 def get_key_pair_name():
@@ -131,7 +131,7 @@ def create_security_group(group_name:str, description:str, vpc_id:str, tags:"dic
         VpcId=vpc_id,
         TagSpecifications=[
             {
-                'ResourceType': 'instance',
+                'ResourceType': 'security-group',
                 'Tags': [
                     {
                         'Key': key,
@@ -153,7 +153,7 @@ def authorize_ingress(security_group:ec2.SecurityGroup, rules: list[dict]):
             ingress_IpPermissions.append(
                 get_ip_policy(rule["protocol"], rule["port"], rule["ip_range"])
             )
-        print(ingress_IpPermissions)
+
         security_group.authorize_ingress(
             IpPermissions=ingress_IpPermissions
         )

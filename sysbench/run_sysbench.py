@@ -36,7 +36,7 @@ if exit_status == 0:
     all_stderr.append(stderr)
     print("done\n")
 else:
-    for line in stderr:
+    for line in stderr.readlines():
         print(line)
     raise Exception(f"Failed to run sysbench on standalone mysql")
 
@@ -49,7 +49,7 @@ if exit_status == 0:
         f.writelines(stdout.readlines())
     print("done\n")
 else:
-    for line in stderr:
+    for line in stderr.readlines():
         print(line)
     raise Exception(f"Failed to run sysbench on standalone mysql")
 
@@ -76,7 +76,7 @@ if exit_status == 0:
     all_stderr.append(stderr)
     print("done\n")
 else:
-    for line in stderr:
+    for line in stderr.readlines():
         print(line)
     raise Exception(f"Failed to run sysbench on cluster manager")
 
@@ -89,7 +89,7 @@ if exit_status == 0:
         f.writelines(stdout.readlines())
     print("done\n")
 else:
-    for line in stderr:
+    for line in stderr.readlines():
         print(line)
     raise Exception(f"Failed to run sysbench on cluster")
 

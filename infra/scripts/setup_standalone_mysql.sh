@@ -13,6 +13,7 @@ sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$root_password';"
 
 git clone https://github.com/MichelleSS1/LOG8415E-Project.git
 # To run mysql_secure_installation without prompt
+sudo apt install -y expect
 sudo ./LOG8415E-Project/script.exp $root_password
 
 mysql -u root -p'$root_password' -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH auth_socket;"

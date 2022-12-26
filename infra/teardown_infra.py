@@ -16,10 +16,10 @@ def teardown_infra(infra_info_path:str):
     print("Starting teardown")
 
     infra_info = get_infra_info(infra_info_path)
-    filters = filters_from_tags(infra_info.instances_tags)
+    filters = filters_from_tags(infra_info.tags)
 
     # Get instances dynamically
-    if len(infra_info.instances_tags) > 0:
+    if len(infra_info.tags) > 0:
         instances_ids = get_instances_ids(filters)
         
         if len(instances_ids) > 0:
