@@ -11,4 +11,4 @@ cd LOG8415E-Project
 pip install -r gatekeeper_requirements.txt
 
 export PROXY_HOST=$proxy_host
-python3 patterns_app/gatekeeper_app.py &
+nohup python3 patterns_app/gatekeeper_app.py > flask_log.txt 2>&1 &
