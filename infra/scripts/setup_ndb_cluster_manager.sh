@@ -50,11 +50,9 @@ sudo debconf-set-selections <<< "mysql-cluster-community-server mysql-server/def
 sudo dpkg -i mysql-cluster-community-server_8.0.31-1ubuntu22.04_amd64.deb
 sudo dpkg -i mysql-server_8.0.31-1ubuntu22.04_amd64.deb
 
-sudo su -
-cat /home/ubuntu/LOG8415E-Project/infra/config_files/mysql.cnf >> /etc/mysql/my.cnf
-sed -i "s/manager_host/$manager_host/" /etc/mysql/my.cnf
-sed -i "s/proxy_host/$proxy_host/" /etc/mysql/my.cnf
-logout
+sudo -i /bin/bash  -c "cat /home/ubuntu/LOG8415E-Project/infra/config_files/mysql.cnf >> /etc/mysql/my.cnf"
+sudo sed -i "s/manager_host/$manager_host/" /etc/mysql/my.cnf
+sudo sed -i "s/proxy_host/$proxy_host/" /etc/mysql/my.cnf
 sudo systemctl restart mysql
 sudo systemctl enable mysql
 

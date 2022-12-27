@@ -17,7 +17,8 @@ git clone https://github.com/MichelleSS1/LOG8415E-Project.git
 # Directory of the configuration file
 sudo mkdir -p /usr/local/mysql/data
 sudo cp LOG8415E-Project/infra/config_files/ndb.cnf /etc/my.cnf
-sudo cp LOG8415E-Project/infra/config_files/ndbd.service /etc/systemd/system/
+sudo sed -i "s/manager_host/$manager_host/" /etc/my.cnf
+sudo cp LOG8415E-Project/infra/config_files/ndbd.service /etc/systemd/system/ndbd.service
 sudo systemctl daemon-reload
 sudo systemctl enable ndbd
 sudo systemctl start ndbd
@@ -48,9 +49,9 @@ sudo debconf-set-selections <<< "mysql-cluster-community-server mysql-server/def
 sudo dpkg -i mysql-cluster-community-server_8.0.31-1ubuntu22.04_amd64.deb
 sudo dpkg -i mysql-server_8.0.31-1ubuntu22.04_amd64.deb
 
-sudo su -
-cat /home/ubuntu/LOG8415E-Project/infra/config_files/mysql.cnf >> /etc/mysql/my.cnf
-logout
+sudo -i /bin/bash  -c "cat /home/ubuntu/LOG8415E-Project/infra/config_files/mysql.cnf >> /etc/mysql/my.cnf"
+sudo sed -i "s/manager_host/$manager_host/" /etc/mysql/my.cnf
+sudo sed -i "s/proxy_host/$proxy_host/" /etc/mysql/my.cnf
 sudo systemctl restart mysql
 sudo systemctl enable mysql
 

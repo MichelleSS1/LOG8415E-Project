@@ -2,7 +2,7 @@
 [mysqld]
 # Options for mysqld process:
 ndbcluster                      # run NDB storage engine
-bind-address=proxy_host
+bind-address=0.0.0.0            
 ndb_read_backup=ON
 ndb_optimized_node_selection=1
 
