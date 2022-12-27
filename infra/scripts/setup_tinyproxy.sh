@@ -20,7 +20,7 @@ FilterDefaultDeny Yes
 EOF
 
 sudo tee /etc/tinyproxy/filter > /dev/null <<EOF
-*\.archive.ubuntu.com$
+.*\.archive.ubuntu.com$
 ^security.ubuntu.com$
 ^github.com$
 ^dev.mysql.com$

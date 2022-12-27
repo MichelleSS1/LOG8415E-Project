@@ -20,7 +20,7 @@ def create_ubuntu_instances(
     """
     Create max_count instances, and at least min_count instances if not possible, with instance_type specifying the type
     of machine to be created and security_groups specifying the security groups of each instance. The operating system
-    will be ubuntu.
+    will be ubuntu. The script user_data will be executed on each instance once it's running.
     They will be located in subnet whose id is subnet_id.
 
     @param instance_type:str            type of instance, specifies the available CPU, memory, etc. ex. t2.micro
@@ -31,6 +31,7 @@ def create_ubuntu_instances(
     @param subnet_id:str                subnet where the machines will be located
     @param security_groups:list[str]    security groups ids to be applied ['sg-id1', 'sg-id2']
     @param tags:dict[str, str]          tags to put on instances
+    @param user_data:str                script to be executed on startup
 
     @return                             response containing the instance IDs and other data 
     """
