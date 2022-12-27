@@ -14,8 +14,12 @@ git clone https://github.com/MichelleSS1/LOG8415E-Project.git
 
 # Directory of the configuration file
 sudo mkdir /var/lib/mysql-cluster
-cp LOG8415E-Project/infra/config_files/config.ini /var/lib/mysql-cluster/
-sudo cp LOG8415E-Project/infra/config_files/ndb_mgmd.service /etc/systemd/system/
+sudo cp LOG8415E-Project/infra/config_files/config.ini /var/lib/mysql-cluster/config.ini
+sudo sed -i "s/manager_host/$manager_host/" /var/lib/mysql-cluster/config.ini
+sudo sed -i "s/data_node1_host/$data_node1_host/" /var/lib/mysql-cluster/config.ini
+sudo sed -i "s/data_node2_host/$data_node2_host/" /var/lib/mysql-cluster/config.ini
+sudo sed -i "s/data_node3_host/$data_node3_host/" /var/lib/mysql-cluster/config.ini
+sudo cp LOG8415E-Project/infra/config_files/ndb_mgmd.service /etc/systemd/system/ndb_mgmd.service
 sudo systemctl daemon-reload
 sudo systemctl enable ndb_mgmd
 sudo systemctl start ndb_mgmd
@@ -48,6 +52,8 @@ sudo dpkg -i mysql-server_8.0.31-1ubuntu22.04_amd64.deb
 
 sudo su -
 cat /home/ubuntu/LOG8415E-Project/infra/config_files/mysql.cnf >> /etc/mysql/my.cnf
+sed -i "s/manager_host/$manager_host/" /etc/mysql/my.cnf
+sed -i "s/proxy_host/$proxy_host/" /etc/mysql/my.cnf
 logout
 sudo systemctl restart mysql
 sudo systemctl enable mysql

@@ -20,11 +20,13 @@ FilterDefaultDeny Yes
 EOF
 
 sudo tee /etc/tinyproxy/filter > /dev/null <<EOF
-.*\.archive.ubuntu.com$
+*\.archive.ubuntu.com$
 ^security.ubuntu.com$
 ^github.com$
 ^dev.mysql.com$
 ^cdn.mysql.com$
+^pypi.org$
+^files.pythonhosted.org$
 EOF
 
 sudo systemctl stop tinyproxy
