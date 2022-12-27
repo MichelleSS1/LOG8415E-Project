@@ -42,6 +42,8 @@ sudo dpkg -i mysql-client_8.0.31-1ubuntu22.04_amd64.deb
 sudo dpkg -i mysql-cluster-community-server-core_8.0.31-1ubuntu22.04_amd64.deb
 
 # To prevent prompt
+echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+sudo apt-get install -y -q 
 sudo debconf-set-selections <<< "mysql-cluster-community-server mysql-cluster-community-server/root-pass password password"
 sudo debconf-set-selections <<< "mysql-cluster-community-server mysql-cluster-community-server/re-root-pass password password"
 sudo debconf-set-selections <<< "mysql-cluster-community-server mysql-server/default-auth-override select Use Strong Password Encryption (RECOMMENDED)"

@@ -15,32 +15,54 @@ MYSQL_PORT = 3306
 NDB_MANAGER_PORT = 1186
 NDB_DATA_NODE_PORT = 2202
 FLASK_PORT = 5000
+TINYPROXY_PORT = 8888
 
 
 def get_absolute_path(relative_path: str):
     return os.path.join(sys.path[0], relative_path)
 
+def ssh_connect_with_retries(client: paramiko.SSHClient, hostname: str, key_filename: str, wait_time: int):
+    """
+    Retry an SSH connection till connected or wait_time is elapsed.
+
+    @param client: paramiko.SSHClient       Paramiko SSHClient to use for connection
+    @param hostname: str                    Hostname to connect to
+    @param key_filename: str                The name of the file holding the private key
+    @param wait_time: int                   Time interval during which it's possible to retry
+    """
+
+    connected = False
+    start = time()
+    while not connected and (time() - start < wait_time):
+        try:
+            client.connect(hostname=hostname, port=22,
+                        username='ubuntu', key_filename=key_filename)
+        except:
+            pass
+        else:
+            connected = True
+
+            print("connected", time() - start)
+
+    if not connected:
+        raise Exception(f"Couldn't establish an SSH connection to host {hostname}")
+
 def get_jumpbox_ssh_public_key(jumpbox_dns_name: str):
+    """
+    Create and copy jumpbox SSH key pair.
+
+    @param jumpbox_dns_name: str            Jumpbox public dns name
+
+    @return: str                            Jumpbox SSH public key
+    """
+
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
 
     pKey_filename = get_absolute_path('../pkey.pem')
 
     print("SSH connection to jumpbox")
-    connection_wait_time = 120
-    connected = False
-    start = time()
-    while not connected and (time() - start < connection_wait_time):
-        try:
-            client.connect(hostname=jumpbox_dns_name, port=22,
-                        username='ubuntu', key_filename=pKey_filename)
-        except:
-            pass
-        else:
-            connected = True
-
-    if not connected:
-        raise Exception("Couldn't establish an SSH connection to the jumpbox")
+    ssh_connect_with_retries(client, jumpbox_dns_name, pKey_filename, 120)
 
     with open(get_absolute_path('scripts/gen_jumpbox_ssh_keypair.sh')) as f:
         script = f.read()
@@ -60,17 +82,28 @@ def get_jumpbox_ssh_public_key(jumpbox_dns_name: str):
     return jumpbox_pub_key
 
 
-def create_jumpbox(vpc_id: str, subnet_id: str, key_name: str, infra_info: InfraInfo):
+def create_jumpbox(vpc_id: str, subnet_id: str, key_name: str, tags: dict[str, str]):
+    """
+    Create jumpbox instance with its security group and SSH key pair.
+
+    @param vpc_id: str                      Virtual Private Cloud ID where to get/create subnets
+    @param subnet_id: str                   Subnet where the machines will be located
+    @param key_name: str                    The name of the key pair used to connect to the instances
+    @param tags: dict[str, str]             Tags to put on instances
+
+    @return: ec2.Instance, str              Jumpbox EC2 instance and SSH public key
+    """
+
     print("Jumpbox creation")
 
     sec_group_jumpbox = create_security_group(
-        "sec_group_jumpbox", "Security group for Jumpbox", vpc_id, infra_info.tags)
+        "sec_group_jumpbox", "Security group for Jumpbox", vpc_id, tags)
     authorize_ingress(sec_group_jumpbox, [
         {"protocol": "tcp", "port": SSH_PORT, "ip_range": "0.0.0.0/0"}
     ])
 
     jumpbox_instance = create_ubuntu_instances("t2.micro", 1, 1, key_name, True, subnet_id,
-                                               [sec_group_jumpbox.id], infra_info.tags | {"Name": "Jumpbox"}, '')[0]
+                                               [sec_group_jumpbox.id], tags | {"Name": "Jumpbox"}, '')[0]
 
     print("Waiting for jumpbox to be running")
     waiter = ec2_client.get_waiter('instance_running')
@@ -86,11 +119,24 @@ def create_jumpbox(vpc_id: str, subnet_id: str, key_name: str, infra_info: Infra
 
     return jumpbox_instance, jumpbox_pub_key
 
-def create_standalone_mysql(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, infra_info: InfraInfo):
+def create_standalone_mysql(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, tags: dict[str, str]):
+    """
+    Create standalone mysql server instance with its security group.
+
+    @param vpc_id: str                      Virtual Private Cloud ID where to get/create subnets
+    @param subnet_id: str                   Subnet where the machines will be located
+    @param key_name: str                    The name of the key pair used to connect to the instances
+    @param user_data: str                   Script to be executed on startup
+    @param jumpbox_private_ip: str          Jumpbox private IP to allow SSH access only to it
+    @param tags: dict[str, str]             Tags to put on instances
+
+    @return: ec2.Instance                   Standalone mysql server EC2 instance
+    """
+
     print("Standalone mysql creation")
 
     sec_group_standalone_mysql = create_security_group(
-        "sec_group_standalone_mysql", "Security group for Standalone MySQL", vpc_id, infra_info.tags)
+        "sec_group_standalone_mysql", "Security group for Standalone MySQL", vpc_id, tags)
     authorize_ingress(sec_group_standalone_mysql, [
         {"protocol": "tcp", "port": MYSQL_PORT, "ip_range": "0.0.0.0/0"},
         {"protocol": "tcp", "port": SSH_PORT,
@@ -98,16 +144,29 @@ def create_standalone_mysql(vpc_id: str, subnet_id: str, key_name: str, user_dat
     ])
 
     standalone_mysql_instance = create_ubuntu_instances(
-        "t2.micro", 1, 1, key_name, True, subnet_id, [sec_group_standalone_mysql.id], infra_info.tags | {"Name": "Standalone"}, user_data)[0]
+        "t2.micro", 1, 1, key_name, True, subnet_id, [sec_group_standalone_mysql.id], tags | {"Name": "Standalone"}, user_data)[0]
 
     print("done\n")
     return standalone_mysql_instance
 
-def create_gatekeeper(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, infra_info: InfraInfo):
+def create_gatekeeper(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, tags: dict[str, str]):
+    """
+    Create Gatekeeper instance with its security group.
+
+    @param vpc_id: str                      Virtual Private Cloud ID where to get/create subnets
+    @param subnet_id: str                   Subnet where the machines will be located
+    @param key_name: str                    The name of the key pair used to connect to the instances
+    @param user_data: str                   Script to be executed on startup
+    @param jumpbox_private_ip: str          Jumpbox private IP to allow SSH access only to it
+    @param tags: dict[str, str]             Tags to put on instances
+
+    @return: ec2.Instance                   Gatekeeper EC2 instance
+    """
+
     print("Gatekeeper creation")
 
     sec_group_gatekeeper = create_security_group(
-        "sec_group_gatekeeper", "Security group for Gatekeeper node", vpc_id, infra_info.tags)
+        "sec_group_gatekeeper", "Security group for Gatekeeper node", vpc_id, tags)
     authorize_ingress(sec_group_gatekeeper, [
         {"protocol": "tcp", "port": FLASK_PORT, "ip_range": "0.0.0.0/0"},
         {"protocol": "tcp", "port": SSH_PORT,
@@ -115,16 +174,31 @@ def create_gatekeeper(vpc_id: str, subnet_id: str, key_name: str, user_data: str
     ])
 
     gatekeeper_instance = create_ubuntu_instances(
-        "t2.large", 1, 1, key_name, True, subnet_id, [sec_group_gatekeeper.id], infra_info.tags | {"Name": "Gatekeeper"}, user_data)[0]
+        "t2.large", 1, 1, key_name, True, subnet_id, [sec_group_gatekeeper.id], tags | {"Name": "Gatekeeper"}, user_data)[0]
 
     print("done\n")
     return gatekeeper_instance
 
-def create_proxy(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, gatekeeper_private_ip: str, infra_info: InfraInfo):
+def create_proxy(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jumpbox_private_ip: str, gatekeeper_private_ip: str, tags: dict[str, str]):
+    """
+    Create Proxy instance (for proxy pattern) with its security group. This instance also plays 
+    the role of the trusted host in the gatekeeper pattern.
+
+    @param vpc_id: str                      Virtual Private Cloud ID where to get/create subnets
+    @param subnet_id: str                   Subnet where the machines will be located
+    @param key_name: str                    The name of the key pair used to connect to the instances
+    @param user_data: str                   Script to be executed on startup
+    @param jumpbox_private_ip: str          Jumpbox private IP to allow SSH access only to it
+    @param gatekeeper_private_ip: str       Gatekeeper private IP to allow flask server access only to it
+    @param tags: dict[str, str]             Tags to put on instances
+
+    @return: ec2.Instance                   Proxy EC2 instance
+    """
+
     print("Proxy creation")
 
     sec_group_proxy = create_security_group(
-        "sec_group_proxy", "Security group for Proxy node", vpc_id, infra_info.tags)
+        "sec_group_proxy", "Security group for Proxy node", vpc_id, tags)
     authorize_ingress(sec_group_proxy, [
         {"protocol": "tcp", "port": FLASK_PORT,
             "ip_range": gatekeeper_private_ip + "/32"},
@@ -133,16 +207,31 @@ def create_proxy(vpc_id: str, subnet_id: str, key_name: str, user_data: str, jum
     ])
 
     proxy_instance = create_ubuntu_instances("t2.large", 1, 1, key_name, False, subnet_id,
-                                             [sec_group_proxy.id], infra_info.tags | {"Name": "Proxy"}, user_data)[0]
+                                             [sec_group_proxy.id], tags | {"Name": "Proxy"}, user_data)[0]
 
     print("done\n")
     return proxy_instance
 
-def create_manager(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str, user_data: str, jumpbox_private_ip: str, proxy_private_ip: str, infra_info: InfraInfo):
+def create_manager(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str, user_data: str, jumpbox_private_ip: str, proxy_private_ip: str, tags: dict[str, str]):
+    """
+    Create NDB cluster Management server instance with its security group. 
+
+    @param vpc_id: str                      Virtual Private Cloud ID where to get/create subnets
+    @param subnet_id: str                   Subnet where the machines will be located
+    @param subnet_cidr: str                 Subnet IP range to restrict cluster connection
+    @param key_name: str                    The name of the key pair used to connect to the instances
+    @param user_data: str                   Script to be executed on startup
+    @param jumpbox_private_ip: str          Jumpbox private IP to allow SSH access only to it
+    @param proxy_private_ip: str            Gatekeeper private IP to allow mysql access only to it
+    @param tags: dict[str, str]             Tags to put on instances
+
+    @return: ec2.Instance                   Manager instance
+    """
+
     print("Manager creation")
 
     sec_group_manager = create_security_group(
-        "sec_group_manager", "Security group for Manager node", vpc_id, infra_info.tags)
+        "sec_group_manager", "Security group for Manager node", vpc_id, tags)
     authorize_ingress(sec_group_manager, [
         {"protocol": "tcp", "port": MYSQL_PORT,
             "ip_range": proxy_private_ip + "/32"},
@@ -152,16 +241,31 @@ def create_manager(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str,
     ])
 
     manager_instance = create_ubuntu_instances(
-        "t2.small", 1, 1, key_name, False, subnet_id, [sec_group_manager.id], infra_info.tags | {"Name": "Manager"}, user_data)[0]
+        "t2.small", 1, 1, key_name, False, subnet_id, [sec_group_manager.id], tags | {"Name": "Manager"}, user_data)[0]
 
     print("done\n")
     return manager_instance
 
-def create_data_nodes(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str, user_data: str, jumpbox_private_ip: str, proxy_private_ip: str, infra_info: InfraInfo):
+def create_data_nodes(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str, user_data: str, jumpbox_private_ip: str, proxy_private_ip: str, tags: dict[str, str]):
+    """
+    Create NDB cluster data nodes instances with their security group. 
+
+    @param vpc_id: str                      Virtual Private Cloud ID where to get/create subnets
+    @param subnet_id: str                   Subnet where the machines will be located
+    @param subnet_cidr: str                 Subnet IP range to restrict cluster connection
+    @param key_name: str                    The name of the key pair used to connect to the instances
+    @param user_data: str                   Script to be executed on startup
+    @param jumpbox_private_ip: str          Jumpbox private IP to allow SSH access only to it
+    @param proxy_private_ip: str            Gatekeeper private IP to allow mysql server access only to it
+    @param tags: dict[str, str]             Tags to put on instances
+
+    @return: list[ec2.Instance]             Data nodes instances
+    """
+
     print("Data nodes creation")
 
     sec_group_data_node = create_security_group(
-        "sec_group_data_node", "Security group for Data nodes", vpc_id, infra_info.tags)
+        "sec_group_data_node", "Security group for Data nodes", vpc_id, tags)
     authorize_ingress(sec_group_data_node, [
         {"protocol": "tcp", "port": MYSQL_PORT,
             "ip_range": proxy_private_ip + "/32"},
@@ -171,18 +275,54 @@ def create_data_nodes(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: s
     ])
 
     data_nodes_instances = create_ubuntu_instances(
-        "t2.small", 3, 3, key_name, False, subnet_id, [sec_group_data_node.id], infra_info.tags, user_data)
+        "t2.small", 3, 3, key_name, False, subnet_id, [sec_group_data_node.id], tags | {"Name": "Data Node"}, user_data)
 
     print("done\n")
     return data_nodes_instances
 
+def create_tinyproxy(vpc_id: str, subnet_id: str, subnet_cidr: str, key_name: str, user_data: str, jumpbox_private_ip: str, tags: dict[str, str]):
+    """
+    Create Tinyproxy instance with its security group. 
+
+    @param vpc_id: str                      Virtual Private Cloud ID where to get/create subnets
+    @param subnet_id: str                   Subnet where the machines will be located
+    @param subnet_cidr: str                 Subnet IP range to restrict access
+    @param key_name: str                    The name of the key pair used to connect to the instances
+    @param user_data: str                   Script to be executed on startup
+    @param jumpbox_private_ip: str          Jumpbox private IP to allow SSH access only to it
+    @param tags: dict[str, str]             Tags to put on instances
+
+    @return: ec2.Instance                   Tinyproxy instance
+    """
+    print("Tinyproxy creation")
+
+    sec_group_tinyproxy = create_security_group(
+        "sec_group_tinyproxy", "Security group for Tinyproxy node", vpc_id, tags)
+    authorize_ingress(sec_group_tinyproxy, [
+        {"protocol": "tcp", "port": TINYPROXY_PORT, "ip_range": subnet_cidr},
+        {"protocol": "tcp", "port": SSH_PORT, "ip_range": jumpbox_private_ip + "/32"}
+    ])
+
+    with open(get_absolute_path('scripts/setup_tinyproxy.sh'), 'r') as f:
+        tinyproxy_user_data = f.read()
+        tinyproxy_user_data = tinyproxy_user_data.replace("$port", str(TINYPROXY_PORT))
+        tinyproxy_user_data = tinyproxy_user_data.replace("$cidr", subnet_cidr)
+
+    tinyproxy_user_data = tinyproxy_user_data + '\n' + user_data
+
+    tinyproxy_instance = create_ubuntu_instances(
+        "t2.micro", 1, 1, key_name, True, subnet_id, [sec_group_tinyproxy.id], tags | {"Name": "Tinyproxy"}, tinyproxy_user_data)[0]
+
+    print("done\n")
+    return tinyproxy_instance
+
 def create_instances(infra_info: InfraInfo):
     """
-    Create instances.
+    Create instances composing the infrastructure.
 
-    @param infra_info:InfraInfo     object that will hold infrastructure information
+    @param infra_info: InfraInfo                Object that will hold infrastructure information
 
-    @return                        object containing infrastructure information
+    @return InfraInfo, dict[str, str]           Object containing infrastructure information, dict of instances IP and dns
     """
     vpc_id = get_vpc_id()
 
@@ -194,21 +334,27 @@ def create_instances(infra_info: InfraInfo):
 
     infra_info.tags = {"Purpose": "LOG8415E-Project"}
 
-    jumpbox_instance, jumpbox_pub_key = create_jumpbox(vpc_id, subnet_id, key_name, infra_info)
+    jumpbox_instance, jumpbox_pub_key = create_jumpbox(vpc_id, subnet_id, key_name, infra_info.tags)
     jumpbox_private_ip = jumpbox_instance.private_ip_address
 
-    user_data = f'''#!/bin/bash\necho "{jumpbox_pub_key}" >> /home/ubuntu/.ssh/authorized_keys\ncat /home/ubuntu/.ssh/authorized_keys'''
+    tinyproxy_instance = create_tinyproxy(vpc_id, subnet_id, subnet_cidr, key_name, 
+        f'echo "{jumpbox_pub_key}" >> /home/ubuntu/.ssh/authorized_keys', 
+        jumpbox_private_ip, infra_info.tags
+    )
+    tinyproxy_private_ip = tinyproxy_instance.private_ip_address
 
-    standalone_mysql_instance  = create_standalone_mysql(vpc_id, subnet_id, key_name, user_data, jumpbox_private_ip, infra_info)
+    user_data = f'''#!/bin/bash\necho "http_proxy=http://{tinyproxy_private_ip}:{TINYPROXY_PORT}/" >> /etc/environment\necho "https_proxy=http://{tinyproxy_private_ip}:{TINYPROXY_PORT}/" >> /etc/environment\necho "{jumpbox_pub_key}" >> /home/ubuntu/.ssh/authorized_keys'''
 
-    gatekeeper_instance = create_gatekeeper(vpc_id, subnet_id, key_name, user_data, jumpbox_private_ip, infra_info)
+    standalone_mysql_instance  = create_standalone_mysql(vpc_id, subnet_id, key_name, user_data, jumpbox_private_ip, infra_info.tags)
+
+    gatekeeper_instance = create_gatekeeper(vpc_id, subnet_id, key_name, user_data, jumpbox_private_ip, infra_info.tags)
     gatekeeper_private_ip = gatekeeper_instance.private_ip_address
 
-    proxy_instance = create_proxy(vpc_id, subnet_id, key_name, user_data, jumpbox_private_ip, gatekeeper_private_ip, infra_info)
+    proxy_instance = create_proxy(vpc_id, subnet_id, key_name, user_data, jumpbox_private_ip, gatekeeper_private_ip, infra_info.tags)
     proxy_private_ip = proxy_instance.private_ip_address
 
-    manager_instance = create_manager(vpc_id, subnet_id, subnet_cidr, key_name, user_data, jumpbox_private_ip, proxy_private_ip, infra_info)
-    data_nodes_instances = create_data_nodes(vpc_id, subnet_id, subnet_cidr, key_name, user_data, jumpbox_private_ip, proxy_private_ip, infra_info)
+    manager_instance = create_manager(vpc_id, subnet_id, subnet_cidr, key_name, user_data, jumpbox_private_ip, proxy_private_ip, infra_info.tags)
+    data_nodes_instances = create_data_nodes(vpc_id, subnet_id, subnet_cidr, key_name, user_data, jumpbox_private_ip, proxy_private_ip, infra_info.tags)
 
     print("Waiting for instances to be in a running state")
 
@@ -218,11 +364,14 @@ def create_instances(infra_info: InfraInfo):
 
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instances_ids_to_wait)
+    # For SSH
+    sleep(60)
 
     print("done\n")
 
     instances_hostnames = {
         "jumpbox": {"host": jumpbox_private_ip, "dns": jumpbox_instance.public_dns_name},
+        "tinyproxy": {"host": tinyproxy_private_ip},
         "standalone_mysql": {"host": standalone_mysql_instance.private_ip_address, "dns": standalone_mysql_instance.public_dns_name},
         "gatekeeper": {"host": gatekeeper_private_ip, "dns": gatekeeper_instance.public_dns_name},
         "proxy":  {"host": proxy_private_ip},
@@ -273,7 +422,6 @@ def setup_instances(instances_hostnames: dict):
 
     for host, path in scripts_path:
 
-        script = ''
         with open(path, 'r') as f:
             script = f.read()
 
@@ -289,10 +437,14 @@ def setup_instances(instances_hostnames: dict):
             script = script.replace("$manager_host", manager_host)
             script = script.replace(
                 "$data_nodes_host", ','.join(data_nodes_host))
+            for i in range(len(data_nodes_host)):
+                script = script.replace(f"$data_node{i+1}_host", data_nodes_host[i])
+
+
+        script = jumpbox_script.replace('$host', host).replace('$script', script)
 
         print(f"Executing setup script of host {host}. It may take some time.")
-        _, stdout, stderr = client.exec_command(
-            command=jumpbox_script.replace('$script', script), get_pty=True)
+        _, stdout, stderr = client.exec_command(command=script, get_pty=True)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status == 0:
             all_stderr.append(stderr)
@@ -324,7 +476,7 @@ if __name__ == '__main__':
             json.dump(instances_hostnames, f)
         stderr = setup_instances(instances_hostnames)
         print("Error output:\n")
-        for line in stderr.readlines():
+        for line in stderr:
             print(line)
     except:
         raise
