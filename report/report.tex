@@ -1,0 +1,58 @@
+\documentclass[11pt]{article}
+\usepackage{float}
+\usepackage{amssymb}
+\usepackage[english]{babel}
+\usepackage{fullpage}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{ragged2e}
+
+\def\titre{}
+\def\auteur{}
+\def\courriel{}
+\makeatletter
+
+\title{Polytechnique Montreal\\LOG8415 : Advanced Concepts of Cloud Computing\\Final Project\\Scaling Databases and Implementing Cloud Patterns}
+
+
+\author{
+    Michelle Sepkap Sime\\
+}
+
+\date{26th December 2022}
+
+
+\begin{document}
+\maketitle
+
+\maketitle
+
+\section{Introduction}
+The object of this assignment was to setup MySQL cluster on Amazon EC2 and implement Cloud patterns.
+We were asked to implement and deploy an architecture by adding the Proxy and the Gatekeeper patterns. Overall I have to install, configure, and benchmark MySQL stand-alone server against the MySQL cluster then implement and compare cloud patterns in a distributed cluster.
+
+\section{Infastructure}
+
+\begin{figure}
+    \includegraphics[width=\linewidth]{architecture.png}
+    \caption{Architecture}
+    \label{fig:arch}
+\end{figure}
+
+\vspace*{0.5cm}
+\noindent
+\begin{itemize}
+\item Jumpbox: t2.micro size, unique instance to use to acess other instances through SSH;
+\item Tinyproxy: t2.micro size, http and https proxy for instances except jumpbox;
+\item Standalone MySQL server: t2.micro size, a standalone mysql server acessible from everywhere as long as you have a user;
+\item Gatekeeper: t2.large size, used in the gatekeeper pattern, client has access to it through a flask application available on port 5000, has access to proxy using private ip on port 5000, only instance that has access to proxy instance;
+\item Proxy: t2.large size, used in the proxy pattern to access databases according to the selected method, also plays the trusted peer role in the gatekeeper pattern, doesn't have public ip, only instance that can access cluster nodes on mysql port;
+\item Manager: t2.small size, management server of the ndb cluster on port 1186, also one of the sql node of the cluster on port 3306, only instances of the same subnet can be part of the cluster;
+\item Data nodes: t2.small size, data nodes of the ndb cluster on port 2202, also sql nodes of the cluster on port 3306, have mysql installed to use ndb cluster options like ndb\_read\_backup=ON and ndb\_optimized\_node\_selection=1 to make queries be executed on the specified data node.
+\end{itemize}
+
+\section{References}
+[1] Github repo. https://github.com/MichelleSS1/LOG8415E-Project.git\newline
+
+\end{document}

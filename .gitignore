@@ -109,6 +109,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+log8415_project_venv/
 
 # Spyder project settings
 .spyderproject
